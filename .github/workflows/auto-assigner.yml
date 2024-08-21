@@ -37,7 +37,7 @@ jobs:
         fi
 
     - name: Assign the PR author as the assignee
-      run: gh issue edit ${{ github.event.pull_request.number }} --assignee ${{ env.author }}
+      run: gh issue assign ${{ github.event.pull_request.number }} --user ${{ env.author }}
 
     - name: Assign reviewers
       run: |
