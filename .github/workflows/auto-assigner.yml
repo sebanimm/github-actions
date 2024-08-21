@@ -1,0 +1,45 @@
+name: Auto Assign Reviewer and Assignee
+
+on:
+  pull_request:
+    types: opened
+
+jobs:
+  assign-reviewers:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js (for using GitHub CLI)
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Get PR author
+      id: get_author
+      run: echo "author=$(jq -r '.pull_request.user.login' $GITHUB_EVENT_PATH)" >> $GITHUB_ENV
+
+    - name: Get repository admins
+      id: get_admins
+      run: |
+        admins=$(gh api -H "Accept: application/vnd.github.v3+json" /repos/${{ github.repository }}/collaborators?affiliation=direct | jq -r '.[] | select(.permissions.admin == true) | .login')
+        echo "admins=$admins" >> $GITHUB_ENV
+
+    - name: Check if PR author is an admin
+      id: check_admin
+      run: |
+        if [[ "${admins}" != *"${{ env.author }}"* ]]; then
+          echo "This PR is not opened by an admin. Exiting..."
+          exit 0
+        fi
+
+    - name: Assign the PR author as the assignee
+      run: gh issue edit ${{ github.event.pull_request.number }} --assignee ${{ env.author }}
+
+    - name: Assign reviewers
+      run: |
+        reviewers=$(echo "${admins}" | grep -v ${{ env.author }} | tr '\n' ',')
+        gh pr edit ${{ github.event.pull_request.number }} --add-reviewer ${reviewers%,}
